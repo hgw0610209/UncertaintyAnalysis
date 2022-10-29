@@ -1,4 +1,5 @@
 # UncertaintyAnalysis
+Supplementary material for a paper studying exposure uncertainty propagation models.
 
 The three main files are:
 1. Simulation.R; The codes for simulation study.
