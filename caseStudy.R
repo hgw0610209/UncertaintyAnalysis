@@ -104,4 +104,93 @@ for(AP in c("pm25_2019_mean","pm25_2018_mean","pm25_2017_mean","pm25_2016_mean",
   
 }
 
+## calculate DIC, MSE, log-likelihood
+
+resultList <- vector(mode = "list",length = 16)
+i=1
+for(pollution_type in c("pm25_2019_mean","pm25_2018_mean","pm25_2017_mean","pm25_2016_mean","pm25_2019_max","pm25_2018_max","pm25_2017_max","pm25_2016_max"))
+{
+ load(paste0("results/stan_resultBYM_caseStudy_",pollution_type,".RData"))
+  resultList[[i]]= stan_result
+i <- i+1
+}
+
+for(pollution_type in c("pm25_2019_mean","pm25_2018_mean","pm25_2017_mean","pm25_2016_mean","pm25_2019_max","pm25_2018_max","pm25_2017_max","pm25_2016_max"))
+{
+ load(paste0("results/stan_resultIAR_caseStudy_",pollution_type,".RData"))
+  resultList[[i]]= stan_result
+i <- i+1
+}
+
+## the counts data
+load(file="data.combined.RData")
+
+  #########################
+    ## Calculate the deviance
+    #########################
+offset.mat <- log(data.combined$Expected_count)
+covariates <- as.matrix(data.combined@data[,9:12])
+exposures <- as.matrix(data.combined@data[,c("pm25_2019_mean","pm25_2018_mean","pm25_2017_mean","pm25_2016_mean","pm25_2019_max","pm25_2018_max","pm25_2017_max","pm25_2016_max")])
+
+DIC <- NULL
+likelihood <- NULL
+MSE<- NULL
+
+for(i in 1:8)
+{
+  
+BYMmodel <- resultList[[i]]
+regression.mat <- covariates%*%t(BYMmodel$alpha) # 1279 (areas) x 1000 (samples)
+pollution.mat <- exposures[,i]%*%t(BYMmodel$lambda) # 1279 (areas) x 1000 (samples)
+theta.mat <- t(BYMmodel$theta*c(1/sqrt(BYMmodel$tau_theta)))# 1279 (areas) x 1000 (samples)
+phi.mat <- t(BYMmodel$phi_kt)# 1279 (areas) x 1000 (samples)
+
+fitted <- as.numeric(exp(offset.mat + regression.mat+ pollution.mat +theta.mat +phi.mat))
+deviance.all <- dpois(x=rep(data.combined$Value,1000), lambda=fitted, log=TRUE)
+meanofLikelihood <- sum(deviance.all)/1000 # this contains 1000 samples   
+    
+regression.mat_mean <- covariates%*%(apply(BYMmodel$alpha,2,median)) # 1279 (areas) 
+pollution.mat_mean <- exposures[,i]*(median(BYMmodel$lambda)) # 1279 (areas) 
+# theta.mat_mean <- apply(BYMmodel$theta,2,median)# 1279 (areas) 
+theta.mat_mean <- apply((BYMmodel$theta)*c(1/sqrt(BYMmodel$tau_theta)),2,median)# 1279 (areas) 
+phi.mat_mean <- apply(BYMmodel$phi_kt,2,median)# 1279 (areas) 
+
+
+fitted_mean <- as.numeric(exp(offset.mat + regression.mat_mean+ pollution.mat_mean +theta.mat_mean +phi.mat_mean))
+Likelihoodofmean <- sum(dpois(x=data.combined$Value, lambda=fitted_mean, log=TRUE))
+
+likelihood <- c(likelihood, Likelihoodofmean)
+
+DIC <- c(DIC, 2*Likelihoodofmean-4*meanofLikelihood)
+MSE <- c(MSE, mean((data.combined$Value-fitted_mean)^2))
+
+}
+
+
+for(i in 9:16)
+{
+  
+IARmodel <- resultList[[i]]
+regression.mat <- covariates%*%t(IARmodel$alpha) # 1279 (areas) x 1000 (samples)
+pollution.mat <- exposures[,i-8]%*%t(IARmodel$lambda) # 1279 (areas) x 1000 (samples)
+phi.mat <- t(IARmodel$phi_kt)# 1279 (areas) x 1000 (samples)
+
+fitted <- as.numeric(exp(offset.mat + regression.mat+pollution.mat +phi.mat))
+deviance.all <- dpois(x=rep(data.combined$Value,1000), lambda=fitted, log=TRUE)
+meanofLikelihood <- sum(deviance.all)/1000 # this contains 1000 samples   
+    
+regression.mat_mean <- covariates%*%(apply(IARmodel$alpha,2,median)) # 1279 (areas) 
+pollution.mat_mean <- exposures[,i-8]*(median(IARmodel$lambda)) # 1279 (areas) 
+phi.mat_mean <- apply(IARmodel$phi_kt,2,median)# 1279 (areas) 
+
+fitted_mean <- as.numeric(exp(offset.mat + regression.mat_mean+pollution.mat_mean +phi.mat_mean))
+Likelihoodofmean <- sum(dpois(x=data.combined$Value, lambda=fitted_mean, log=TRUE))
+
+likelihood <- c(likelihood, Likelihoodofmean)
+
+DIC <- c(DIC, 2*Likelihoodofmean-4*meanofLikelihood)
+
+MSE <- c(MSE, mean((data.combined$Value-fitted_mean)^2))
+
+}
 
