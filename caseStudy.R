@@ -193,3 +193,48 @@ MSE <- c(MSE, mean((data.combined$Value-fitted_mean)^2))
 
 }
 
+############cumulative exposure model########################
+
+data.combined$pm25meancumul_01 <- 0.5*(data.combined$pm25_2019_mean+data.combined$pm25_2018_mean)
+data.combined$pm25meancumul_02 <- (data.combined$pm25_2019_mean+data.combined$pm25_2018_mean+data.combined$pm25_2017_mean)/3
+data.combined$pm25meancumul_03 <- (data.combined$pm25_2019_mean+data.combined$pm25_2018_mean+data.combined$pm25_2017_mean+data.combined$pm25_2016_mean)/4
+
+# run the stan pollution model --------------------------------------------
+
+mod.data <- list(k_area=1279,
+                 n_covariate=4,
+                 Y_kt=data.combined$Value,
+                 E_kt=data.combined$Expected_count,
+                 area_AP=data.combined$pm25_2019_mean,
+                 covariates=as.matrix(data.combined@data[,9:12]),
+                 N_edges=N_edges,
+                 node1=node1,
+                 node2=node2
+)
+
+#### NO2, MEAN, EFFECT
+Nsample=10000
+thin=10
+
+for(AP in c("pm25meancumul_01","pm25meancumul_02","pm25meancumul_03"))
+{
+  
+  mod.data$area_AP <- data.combined[,AP]@data[,1]
+  
+  stan_model <-  rstan::sampling(fit.model_BYM_caseStudy,  data = mod.data,seed=158, control = list(max_treedepth=15),
+                                 iter = Nsample, chains = 2, thin = thin,verbose=TRUE, par=c("alpha","lambda","nu2","phi_kt","theta","tau_theta")
+  )
+  stan_result <-rstan::extract(stan_model)
+  save(stan_result, file=paste0("results/stan_result","BYM_caseStudy_",AP,".RData"))
+  
+  
+  
+  stan_model <-  rstan::sampling(fit.model_IAR_caseStudy,  data = mod.data,seed=158, control = list(max_treedepth=15),
+                                 iter = Nsample, chains = 2, thin = thin,verbose=TRUE, par=c("alpha","lambda","nu2","phi_kt")
+  )
+  stan_result <-rstan::extract(stan_model)
+  save(stan_result, file=paste0("results/stan_result","IAR_caseStudy_",AP,".RData"))
+  
+  
+  
+}
