@@ -151,7 +151,6 @@ meanofLikelihood <- sum(deviance.all)/1000 # this contains 1000 samples
     
 regression.mat_mean <- covariates%*%(apply(BYMmodel$alpha,2,median)) # 1279 (areas) 
 pollution.mat_mean <- exposures[,i]*(median(BYMmodel$lambda)) # 1279 (areas) 
-# theta.mat_mean <- apply(BYMmodel$theta,2,median)# 1279 (areas) 
 theta.mat_mean <- apply((BYMmodel$theta)*c(1/sqrt(BYMmodel$tau_theta)),2,median)# 1279 (areas) 
 phi.mat_mean <- apply(BYMmodel$phi_kt,2,median)# 1279 (areas) 
 
